@@ -95,3 +95,23 @@ export const EntityOverviewDashboardViewer = grafanaPlugin.provide(
     },
   })
 );
+
+export const EntityGrafanaEnhancedAlertsCard = grafanaPlugin.provide(
+  createComponentExtension({
+    name: 'EntityGrafanaEnhancedAlertsCard',
+    component: {
+      lazy: () =>
+        import('./components/EnhancedAlertsCard').then(m => m.EnhancedAlertsCard),
+    },
+  })
+);
+
+export const EntityGrafanaSLOCard = grafanaPlugin.provide(
+  createComponentExtension({
+    name: 'EntityGrafanaSLOCard',
+    component: {
+      lazy: () =>
+        import('./components/SLOCard').then(m => m.SLOCard),
+    },
+  })
+);

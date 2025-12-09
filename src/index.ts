@@ -17,11 +17,15 @@
 export { DashboardViewer } from './components/DashboardViewer';
 export { MetricsCard } from './components/MetricsCard';
 export { DashboardsCard } from './components/DashboardsCard';
+export { EnhancedAlertsCard } from './components/EnhancedAlertsCard';
+export { SLOCard } from './components/SLOCard';
 export {
   grafanaPlugin,
   EntityGrafanaDashboardsCard,
   EntityGrafanaAlertsCard,
   EntityGrafanaMetricsCard,
+  EntityGrafanaEnhancedAlertsCard,
+  EntityGrafanaSLOCard,
   EntityOverviewDashboardViewer,
 } from './plugin';
 export {

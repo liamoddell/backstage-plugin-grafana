@@ -16,11 +16,15 @@
 
 import { createApiRef, DiscoveryApi, IdentityApi } from '@backstage/core-plugin-api';
 import { QueryEvaluator } from './query';
-import { Alert, Dashboard } from './types';
+import { Alert, AlertDetail, Dashboard, DashboardDetail, SLO, TimeSeries, TimeRange, MetricsQueryResponse } from './types';
 
 export interface GrafanaApi {
   listDashboards(query: string): Promise<Dashboard[]>;
   alertsForSelector(selector: string): Promise<Alert[]>;
+  getDashboardByUid(uid: string): Promise<DashboardDetail>;
+  queryMetrics(query: string, timeRange: TimeRange, step?: string): Promise<TimeSeries[]>;
+  getSLOs(labelSelector?: string): Promise<SLO[]>;
+  getAlertDetails(selector: string): Promise<AlertDetail[]>;
 }
 
 interface AlertRuleGroupConfig {
@@ -43,6 +47,7 @@ interface UnifiedGrafanaAlert {
 
 interface AlertRule {
   labels: Record<string, string>;
+  annotations?: Record<string, string>;
   grafana_alert: UnifiedGrafanaAlert;
 }
 
@@ -121,6 +126,106 @@ class Client {
     return this.fullyQualifiedDashboardURLs(domain, response);
   }
 
+  async getDashboardByUid(domain: string, uid: string): Promise<DashboardDetail> {
+    const response = await this.fetch<{ dashboard: any }>(`/api/dashboards/uid/${uid}`);
+    const dashboard = response.dashboard;
+
+    return {
+      title: dashboard.title,
+      url: `${domain}/d/${uid}`,
+      folderTitle: dashboard.meta?.folderTitle || '',
+      folderUrl: `${domain}${dashboard.meta?.folderUrl || ''}`,
+      tags: dashboard.tags || [],
+      uid: dashboard.uid,
+      panels: dashboard.panels || [],
+    };
+  }
+
+  async queryMetrics(query: string, timeRange: TimeRange, step: string = '15s'): Promise<TimeSeries[]> {
+    const datasourceUid = await this.getDefaultPrometheusUid();
+    const now = Math.floor(Date.now() / 1000);
+    const from = this.parseTimeRange(timeRange.from, now);
+    const to = this.parseTimeRange(timeRange.to, now);
+
+    const params = new URLSearchParams({
+      query,
+      start: from.toString(),
+      end: to.toString(),
+      step,
+    });
+
+    const response = await this.fetch<MetricsQueryResponse>(
+      `/api/datasources/proxy/uid/${datasourceUid}/api/v1/query_range?${params}`
+    );
+
+    if (response.status !== 'success' || !response.data.result) {
+      return [];
+    }
+
+    return response.data.result.map(result => ({
+      target: result.metric.__name__ || JSON.stringify(result.metric),
+      datapoints: result.values.map(([timestamp, value]) => ({
+        timestamp: timestamp * 1000,
+        value: parseFloat(value),
+      })),
+    }));
+  }
+
+  async getSLOs(labelSelector?: string): Promise<SLO[]> {
+    try {
+      let url = '/api/plugins/grafana-slo-app/resources/v1/slo';
+      if (labelSelector) {
+        const params = new URLSearchParams({ labelSelector });
+        url += `?${params}`;
+      }
+
+      const response = await this.fetch<SLO[]>(url);
+      return response;
+    } catch (error) {
+      return [];
+    }
+  }
+
+  private async getDefaultPrometheusUid(): Promise<string> {
+    try {
+      const datasources = await this.fetch<any[]>('/api/datasources');
+      const promDs = datasources.find(ds => ds.type === 'prometheus' && ds.isDefault);
+      if (promDs) {
+        return promDs.uid;
+      }
+      const anyPromDs = datasources.find(ds => ds.type === 'prometheus');
+      if (anyPromDs) {
+        return anyPromDs.uid;
+      }
+      throw new Error('No Prometheus datasource found');
+    } catch (error) {
+      throw new Error(`Failed to find Prometheus datasource: ${error}`);
+    }
+  }
+
+  private parseTimeRange(timeStr: string, now: number): number {
+    if (timeStr === 'now') {
+      return now;
+    }
+
+    const match = timeStr.match(/^now-(\d+)([smhd])$/);
+    if (!match) {
+      return now;
+    }
+
+    const value = parseInt(match[1], 10);
+    const unit = match[2];
+
+    const seconds: Record<string, number> = {
+      s: 1,
+      m: 60,
+      h: 3600,
+      d: 86400,
+    };
+
+    return now - (value * seconds[unit]);
+  }
+
   private fullyQualifiedDashboardURLs(domain: string, dashboards: Dashboard[]): Dashboard[] {
     return dashboards.map(dashboard => ({
       ...dashboard,
@@ -172,6 +277,31 @@ export class GrafanaApiClient implements GrafanaApi {
       }
     ));
   }
+
+  async getDashboardByUid(uid: string): Promise<DashboardDetail> {
+    return this.client.getDashboardByUid(this.domain, uid);
+  }
+
+  async queryMetrics(query: string, timeRange: TimeRange, step?: string): Promise<TimeSeries[]> {
+    return this.client.queryMetrics(query, timeRange, step);
+  }
+
+  async getSLOs(labelSelector?: string): Promise<SLO[]> {
+    return this.client.getSLOs(labelSelector);
+  }
+
+  async getAlertDetails(dashboardTag: string): Promise<AlertDetail[]> {
+    const response = await this.client.fetch<GrafanaAlert[]>(`/api/alerts?dashboardTag=${dashboardTag}`);
+
+    return response.map(alert => ({
+      name: alert.name,
+      state: alert.state,
+      url: `${this.domain}${alert.url}?panelId=${alert.panelId}&fullscreen&refresh=30s`,
+      severity: 'unknown',
+      labels: {},
+      annotations: {},
+    }));
+  }
 }
 
 export class UnifiedAlertingGrafanaApiClient implements GrafanaApi {
@@ -201,5 +331,41 @@ export class UnifiedAlertingGrafanaApiClient implements GrafanaApi {
         state: "n/a",
       };
     })
+  }
+
+  async getDashboardByUid(uid: string): Promise<DashboardDetail> {
+    return this.client.getDashboardByUid(this.domain, uid);
+  }
+
+  async queryMetrics(query: string, timeRange: TimeRange, step?: string): Promise<TimeSeries[]> {
+    return this.client.queryMetrics(query, timeRange, step);
+  }
+
+  async getSLOs(labelSelector?: string): Promise<SLO[]> {
+    return this.client.getSLOs(labelSelector);
+  }
+
+  async getAlertDetails(selector: string): Promise<AlertDetail[]> {
+    const response = await this.client.fetch<Record<string, AlertRuleGroupConfig[]>>('/api/ruler/grafana/api/v1/rules');
+    const rules = Object.values(response).flat().map(ruleGroup => ruleGroup.rules).flat();
+
+    const selectors = selector.split(',').map(s => {
+      const [key, value] = s.trim().split('=');
+      return { key, value };
+    });
+
+    const matchingRules = rules.filter(rule => {
+      if (!rule.labels) return false;
+      return selectors.every(({ key, value }) => rule.labels[key] === value);
+    });
+
+    return matchingRules.map(rule => ({
+      name: rule.grafana_alert.title,
+      url: `${this.domain}/alerting/grafana/${rule.grafana_alert.uid}/view`,
+      state: "n/a",
+      severity: rule.labels?.severity || 'unknown',
+      labels: rule.labels || {},
+      annotations: rule.annotations || {},
+    }));
   }
 }

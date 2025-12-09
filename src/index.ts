@@ -15,21 +15,27 @@
  */
 
 export { DashboardViewer } from './components/DashboardViewer';
+export { MetricsCard } from './components/MetricsCard';
+export { DashboardsCard } from './components/DashboardsCard';
 export {
   grafanaPlugin,
   EntityGrafanaDashboardsCard,
   EntityGrafanaAlertsCard,
+  EntityGrafanaMetricsCard,
   EntityOverviewDashboardViewer,
 } from './plugin';
 export {
   isDashboardSelectorAvailable,
   isAlertSelectorAvailable,
   isOverviewDashboardAvailable,
+  isMetricsSelectorAvailable,
   dashboardSelectorFromEntity,
   alertSelectorFromEntity,
   overviewDashboardFromEntity,
+  metricsSelectorFromEntity,
   GRAFANA_ANNOTATION_DASHBOARD_SELECTOR,
   GRAFANA_ANNOTATION_ALERT_LABEL_SELECTOR,
   GRAFANA_ANNOTATION_TAG_SELECTOR,
   GRAFANA_ANNOTATION_OVERVIEW_DASHBOARD,
+  GRAFANA_ANNOTATION_METRICS_SELECTOR,
 } from './components/grafanaData';

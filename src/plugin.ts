@@ -66,6 +66,26 @@ export const EntityGrafanaAlertsCard = grafanaPlugin.provide(
   })
 );
 
+export const EntityGrafanaMetricsCard = grafanaPlugin.provide(
+  createComponentExtension({
+    name: 'EntityGrafanaMetricsCard',
+    component: {
+      lazy: () =>
+        import('./components/MetricsCard').then(m => m.MetricsCard),
+    },
+  })
+);
+
+export const EntityGrafanaDashboardsCardWithTimeRange = grafanaPlugin.provide(
+  createComponentExtension({
+    name: 'EntityGrafanaDashboardsCardWithTimeRange',
+    component: {
+      lazy: () =>
+        import('./components/DashboardsCard').then(m => m.DashboardsCard),
+    },
+  })
+);
+
 export const EntityOverviewDashboardViewer = grafanaPlugin.provide(
   createComponentExtension({
     name: 'EntityOverviewDashboardViewer',

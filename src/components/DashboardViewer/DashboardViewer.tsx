@@ -17,6 +17,7 @@
 import React from 'react';
 import { MissingAnnotationEmptyState } from '@backstage/core-components';
 import { useEntity } from '@backstage/plugin-catalog-react';
+import { useApi, configApiRef } from '@backstage/core-plugin-api';
 import {
   GRAFANA_ANNOTATION_OVERVIEW_DASHBOARD,
   isOverviewDashboardAvailable,
@@ -37,10 +38,15 @@ export const DashboardViewer = ({ embedUrl }: { embedUrl: string }) => {
 
 export const EntityDashboardViewer = () => {
   const { entity } = useEntity();
+  const config = useApi(configApiRef);
 
   if (!isOverviewDashboardAvailable(entity)) {
     return <MissingAnnotationEmptyState annotation={GRAFANA_ANNOTATION_OVERVIEW_DASHBOARD} />;
   }
 
-  return <DashboardViewer embedUrl={overviewDashboardFromEntity(entity)} />
+  const grafanaDomain = config.getString('grafana.domain');
+  const dashboardPath = overviewDashboardFromEntity(entity);
+  const embedUrl = `${grafanaDomain}/d/${dashboardPath}&theme=dark&kiosk`;
+
+  return <DashboardViewer embedUrl={embedUrl} />
 };

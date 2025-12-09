@@ -27,3 +27,71 @@ export interface Alert {
   state: string;
   url: string;
 }
+
+export interface TimeRange {
+  from: string;
+  to: string;
+}
+
+export interface MetricDataPoint {
+  timestamp: number;
+  value: number;
+}
+
+export interface TimeSeries {
+  target: string;
+  datapoints: MetricDataPoint[];
+}
+
+export interface MetricsQueryResponse {
+  status: string;
+  data: {
+    resultType: string;
+    result: Array<{
+      metric: Record<string, string>;
+      values: Array<[number, string]>;
+    }>;
+  };
+}
+
+export interface DashboardPanel {
+  id: number;
+  title: string;
+  type: string;
+  targets: PanelTarget[];
+}
+
+export interface PanelTarget {
+  expr: string;
+  datasource: any;
+}
+
+export interface DashboardDetail extends Dashboard {
+  uid: string;
+  panels: DashboardPanel[];
+}
+
+export interface SLO {
+  uuid: string;
+  name: string;
+  description: string;
+  query: {
+    type: string;
+  };
+  objectives: Array<{
+    value: number;
+    window: string;
+  }>;
+  status?: {
+    current: number;
+    remaining_error_budget: number;
+  };
+  labels?: Record<string, string>;
+}
+
+export interface AlertDetail extends Alert {
+  severity?: string;
+  labels?: Record<string, string>;
+  annotations?: Record<string, string>;
+  firing_since?: string;
+}

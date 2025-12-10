@@ -73,17 +73,23 @@ if ! echo "$DATASOURCES" | jq -e 'type == "array"' > /dev/null 2>&1; then
   exit 1
 fi
 
-PROM_UID=$(echo "$DATASOURCES" | jq -r '.[] | select(.type=="prometheus") | .uid' | head -1)
+# Look for the metrics datasource with the expected naming pattern
+# Try common Grafana Cloud patterns: -prom, -metrics, or exact match
+PROM_UID=$(echo "$DATASOURCES" | jq -r ".[] | select(.type==\"prometheus\" and (.name==\"grafanacloud-${GRAFANA_ORG}-prom\" or .name==\"grafanacloud-${GRAFANA_ORG}-metrics\" or .name==\"${GRAFANA_ORG}\")) | .uid" | head -1)
 
 if [ -z "$PROM_UID" ]; then
-  echo "Error: No Prometheus datasource found"
+  echo "Error: Could not find Grafana Cloud Prometheus datasource"
   echo ""
-  echo "Available datasources:"
-  echo "$DATASOURCES" | jq -r '.[] | "  - \(.name) (\(.type))"'
+  echo "Available Prometheus datasources:"
+  echo "$DATASOURCES" | jq -r '.[] | select(.type=="prometheus") | "  - \(.name) (uid: \(.uid))"'
+  echo ""
+  echo "Expected pattern: grafanacloud-${GRAFANA_ORG}-prom or grafanacloud-${GRAFANA_ORG}-metrics"
   exit 1
 fi
 
-echo "Found Prometheus datasource: $PROM_UID"
+DATASOURCE_NAME=$(echo "$DATASOURCES" | jq -r ".[] | select(.uid==\"$PROM_UID\") | .name")
+
+echo "Found Prometheus datasource: $DATASOURCE_NAME (uid: $PROM_UID)"
 
 if [ "$TEST_MODE" = true ]; then
   echo ""
@@ -112,7 +118,7 @@ echo "$SERVICES"
 echo ""
 echo "Generating entities.yaml..."
 
-OUTPUT_FILE="../../examples/entities-generated.yaml"
+OUTPUT_FILE="$SCRIPT_DIR/../examples/entities-generated.yaml"
 
 # Write header
 cat > "$OUTPUT_FILE" <<EOF
@@ -186,7 +192,7 @@ echo "✅ Generated $OUTPUT_FILE"
 echo ""
 
 # Update app-config.yaml to include the generated entities
-APP_CONFIG="../../app-config.yaml"
+APP_CONFIG="$SCRIPT_DIR/../app-config.yaml"
 
 echo "Updating $APP_CONFIG to include generated entities..."
 

@@ -1,0 +1,15 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: grafana-demo
+  description: An example of a Backstage application.
+  annotations:
+    # Grafana plugin annotations
+    grafana/alert-label-selector: 'service=email'
+    grafana/metrics-selector: 'service="email"'
+    # Overview dashboard with variables
+    grafana/overview-dashboard: 'li4hmgh?var-service=email'
+spec:
+  type: service
+  owner: john@example.com
+  lifecycle: experimental

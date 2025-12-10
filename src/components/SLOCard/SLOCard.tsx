@@ -15,7 +15,7 @@
  */
 
 import React from 'react';
-import { Progress, Link } from '@backstage/core-components';
+import { Progress, Link, MissingAnnotationEmptyState } from '@backstage/core-components';
 import { Entity } from '@backstage/catalog-model';
 import { useEntity } from '@backstage/plugin-catalog-react';
 import { configApiRef, useApi } from '@backstage/core-plugin-api';
@@ -23,6 +23,11 @@ import { grafanaApiRef } from '../../api';
 import { useAsync } from 'react-use';
 import { Alert } from '@material-ui/lab';
 import { SLO } from '../../types';
+import {
+  GRAFANA_ANNOTATION_SLO_LABEL_SELECTOR,
+  isSLOSelectorAvailable,
+  sloSelectorFromEntity,
+} from '../grafanaData';
 import {
   Box,
   Card,
@@ -102,14 +107,6 @@ const useStyles = makeStyles((theme) => ({
     marginTop: theme.spacing(1),
   },
 }));
-
-const GRAFANA_ANNOTATION_SLO_LABEL_SELECTOR = 'grafana/slo-label-selector';
-
-const isSLOSelectorAvailable = (entity: Entity) =>
-  Boolean(entity?.metadata.annotations?.[GRAFANA_ANNOTATION_SLO_LABEL_SELECTOR]);
-
-const sloSelectorFromEntity = (entity: Entity) =>
-  entity?.metadata.annotations?.[GRAFANA_ANNOTATION_SLO_LABEL_SELECTOR] ?? '';
 
 interface SLOStatusIndicatorProps {
   slo: SLO;
@@ -281,23 +278,7 @@ export const SLOCard = (opts?: SLOCardOpts) => {
   const { entity } = useEntity();
 
   if (!isSLOSelectorAvailable(entity)) {
-    return (
-      <Card className={classes.card}>
-        <CardContent>
-          <Typography variant="h6" gutterBottom>
-            {opts?.title || 'SLOs'}
-          </Typography>
-          <Box className={classes.emptyState}>
-            <Typography variant="body2">
-              Add the annotation <code>{GRAFANA_ANNOTATION_SLO_LABEL_SELECTOR}</code> to your entity to view SLOs.
-            </Typography>
-            <Typography variant="caption" style={{ marginTop: 8, display: 'block' }}>
-              Example: grafana/slo-label-selector: "service_name=frontend"
-            </Typography>
-          </Box>
-        </CardContent>
-      </Card>
-    );
+    return <MissingAnnotationEmptyState annotation={GRAFANA_ANNOTATION_SLO_LABEL_SELECTOR} />;
   }
 
   return (

@@ -22,16 +22,19 @@ export const GRAFANA_ANNOTATION_DASHBOARD_SELECTOR = 'grafana/dashboard-selector
 export const GRAFANA_ANNOTATION_ALERT_LABEL_SELECTOR = 'grafana/alert-label-selector';
 export const GRAFANA_ANNOTATION_OVERVIEW_DASHBOARD = 'grafana/overview-dashboard';
 export const GRAFANA_ANNOTATION_METRICS_SELECTOR = 'grafana/metrics-selector';
+export const GRAFANA_ANNOTATION_SLO_LABEL_SELECTOR = 'grafana/slo-label-selector';
 
 export const isDashboardSelectorAvailable = (entity: Entity) => entity?.metadata.annotations?.[GRAFANA_ANNOTATION_DASHBOARD_SELECTOR] || entity?.metadata.annotations?.[GRAFANA_ANNOTATION_TAG_SELECTOR];
 export const isAlertSelectorAvailable = (entity: Entity) => Boolean(entity?.metadata.annotations?.[GRAFANA_ANNOTATION_ALERT_LABEL_SELECTOR]);
 export const isOverviewDashboardAvailable = (entity: Entity) => Boolean(entity?.metadata.annotations?.[GRAFANA_ANNOTATION_OVERVIEW_DASHBOARD]);
 export const isMetricsSelectorAvailable = (entity: Entity) => Boolean(entity?.metadata.annotations?.[GRAFANA_ANNOTATION_METRICS_SELECTOR]);
+export const isSLOSelectorAvailable = (entity: Entity) => Boolean(entity?.metadata.annotations?.[GRAFANA_ANNOTATION_SLO_LABEL_SELECTOR]);
 
 export const dashboardSelectorFromEntity = (entity: Entity) => entity?.metadata.annotations?.[GRAFANA_ANNOTATION_DASHBOARD_SELECTOR] ?? entity?.metadata.annotations?.[GRAFANA_ANNOTATION_TAG_SELECTOR] ?? '';
 export const alertSelectorFromEntity = (entity: Entity) => entity?.metadata.annotations?.[GRAFANA_ANNOTATION_ALERT_LABEL_SELECTOR] ?? '';
 export const overviewDashboardFromEntity = (entity: Entity) => entity?.metadata.annotations?.[GRAFANA_ANNOTATION_OVERVIEW_DASHBOARD] ?? '';
 export const metricsSelectorFromEntity = (entity: Entity) => entity?.metadata.annotations?.[GRAFANA_ANNOTATION_METRICS_SELECTOR] ?? '';
+export const sloSelectorFromEntity = (entity: Entity) => entity?.metadata.annotations?.[GRAFANA_ANNOTATION_SLO_LABEL_SELECTOR] ?? '';
 
 // @deprecated Use dashboardSelectorFromEntity instead
 export const tagSelectorFromEntity = dashboardSelectorFromEntity;

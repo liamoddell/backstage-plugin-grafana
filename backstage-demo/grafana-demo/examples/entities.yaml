@@ -1,0 +1,510 @@
+---
+# OpenTelemetry Demo - Astronomy Shop
+# Based on https://github.com/grafana/lgtm-otel-demo
+# Real microservices with actual telemetry data
+
+# ==================== SYSTEMS ====================
+
+apiVersion: backstage.io/v1alpha1
+kind: System
+metadata:
+  name: astronomy-shop
+  description: E-commerce platform for astronomy equipment (OpenTelemetry Demo)
+  links:
+    - url: http://localhost:8080
+      title: Shop Frontend
+      icon: web
+spec:
+  owner: platform-team
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: System
+metadata:
+  name: observability-platform
+  description: Monitoring and observability infrastructure
+  links:
+    - url: http://localhost:3000
+      title: Grafana
+      icon: dashboard
+spec:
+  owner: sre-team
+
+# ==================== TEAMS ====================
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: Group
+metadata:
+  name: platform-team
+  description: Platform Engineering Team
+spec:
+  type: team
+  children: []
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: Group
+metadata:
+  name: sre-team
+  description: Site Reliability Engineering Team
+spec:
+  type: team
+  children: []
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: Group
+metadata:
+  name: checkout-team
+  description: Checkout and Payment Team
+spec:
+  type: team
+  children: []
+
+# ==================== FRONTEND ====================
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: frontend
+  description: Web frontend for the Astronomy Shop
+  tags:
+    - frontend
+    - web
+    - nextjs
+    - production
+  links:
+    - url: http://localhost:8080
+      title: Frontend UI
+      icon: web
+  annotations:
+    # For MetricsCard - OpenTelemetry span metrics
+    grafana/metrics-selector: 'service_name="frontend",span_kind="SPAN_KIND_SERVER"'
+    # For EnhancedAlertsCard - unified alerting
+    grafana/alert-label-selector: 'service_name=frontend'
+    # For SLOCard
+    grafana/slo-label-selector: 'service_name=frontend'
+    # Dashboard
+    grafana/overview-dashboard: 'li4hmgh?var-service=frontend'
+spec:
+  type: website
+  lifecycle: production
+  owner: platform-team
+  system: astronomy-shop
+  dependsOn:
+    - component:default/checkout-service
+    - component:default/product-catalog-service
+    - component:default/cart-service
+    - component:default/recommendation-service
+    - component:default/ad-service
+    - component:default/currency-service
+
+# ==================== BACKEND SERVICES ====================
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: checkout-service
+  description: Handles order checkout and orchestrates payment and shipping
+  tags:
+    - backend
+    - checkout
+    - go
+    - production
+    - critical
+  annotations:
+    # For MetricsCard - OpenTelemetry span metrics
+    grafana/metrics-selector: 'service_name="checkoutservice",span_kind="SPAN_KIND_SERVER"'
+    # For EnhancedAlertsCard - unified alerting
+    grafana/alert-label-selector: 'service_name=checkoutservice,service_namespace=opentelemetry-demo'
+    # For SLOCard
+    grafana/slo-label-selector: 'service_name=checkoutservice'
+    # Dashboard
+    grafana/dashboard-selector: "checkoutservice"
+    grafana/overview-dashboard: 'li4hmgh?var-service=checkout'
+spec:
+  type: service
+  lifecycle: production
+  owner: checkout-team
+  system: astronomy-shop
+  providesApis:
+    - checkout-api
+  consumesApis:
+    - payment-api
+    - shipping-api
+    - email-api
+    - cart-api
+    - product-catalog-api
+    - currency-api
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: payment-service
+  description: Processes payment transactions
+  tags:
+    - backend
+    - payment
+    - nodejs
+    - production
+    - critical
+    - financial
+  annotations:
+    grafana/dashboard-selector: "paymentservice"
+    grafana/alert-label-selector: "service_name=paymentservice,service_namespace=opentelemetry-demo"
+    grafana/metrics-selector: 'job="opentelemetry-demo/payment"'
+    grafana/overview-dashboard: 'li4hmgh?var-service=payment'
+spec:
+  type: service
+  lifecycle: production
+  owner: checkout-team
+  system: astronomy-shop
+  providesApis:
+    - payment-api
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: product-catalog-service
+  description: Manages product catalog and inventory
+  tags:
+    - backend
+    - catalog
+    - go
+    - production
+  annotations:
+    grafana/dashboard-selector: "productcatalogservice"
+    grafana/alert-label-selector: "service_name=productcatalogservice,service_namespace=opentelemetry-demo"
+    grafana/metrics-selector: 'job="opentelemetry-demo/productcatalog"'
+    grafana/overview-dashboard: 'li4hmgh?var-service=product-catalog'
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-team
+  system: astronomy-shop
+  providesApis:
+    - product-catalog-api
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: cart-service
+  description: Shopping cart management with Redis backend
+  tags:
+    - backend
+    - cart
+    - dotnet
+    - production
+  annotations:
+    grafana/dashboard-selector: "cartservice"
+    grafana/alert-label-selector: "service_name=cartservice,service_namespace=opentelemetry-demo"
+    grafana/metrics-selector: 'job="opentelemetry-demo/cart"'
+    grafana/overview-dashboard: 'li4hmgh?var-service=cart'
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-team
+  system: astronomy-shop
+  providesApis:
+    - cart-api
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: recommendation-service
+  description: Product recommendation engine using ML
+  tags:
+    - backend
+    - ml
+    - python
+    - production
+  annotations:
+    grafana/dashboard-selector: "recommendationservice"
+    grafana/alert-label-selector: "service_name=recommendationservice,service_namespace=opentelemetry-demo"
+    grafana/metrics-selector: 'job="opentelemetry-demo/recommendation"'
+    grafana/overview-dashboard: 'li4hmgh?var-service=recommendation'
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-team
+  system: astronomy-shop
+  providesApis:
+    - recommendation-api
+  consumesApis:
+    - product-catalog-api
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: shipping-service
+  description: Calculates shipping costs and provides quotes
+  tags:
+    - backend
+    - shipping
+    - rust
+    - production
+  annotations:
+    grafana/dashboard-selector: "shippingservice"
+    grafana/alert-label-selector: "service_name=shippingservice,service_namespace=opentelemetry-demo"
+    grafana/metrics-selector: 'job="opentelemetry-demo/shipping"'
+    grafana/overview-dashboard: 'li4hmgh?var-service=shipping'
+spec:
+  type: service
+  lifecycle: production
+  owner: checkout-team
+  system: astronomy-shop
+  providesApis:
+    - shipping-api
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: email-service
+  description: Sends order confirmation emails
+  tags:
+    - backend
+    - email
+    - ruby
+    - production
+  annotations:
+    grafana/dashboard-selector: "emailservice"
+    grafana/alert-label-selector: "service_name=emailservice,service_namespace=opentelemetry-demo"
+    grafana/metrics-selector: 'job="opentelemetry-demo/email"'
+    grafana/overview-dashboard: 'li4hmgh?var-service=email'
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-team
+  system: astronomy-shop
+  providesApis:
+    - email-api
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: ad-service
+  description: Serves contextual advertisements
+  tags:
+    - backend
+    - advertising
+    - java
+    - production
+  annotations:
+    grafana/dashboard-selector: "adservice"
+    grafana/alert-label-selector: "service_name=adservice,service_namespace=opentelemetry-demo"
+    grafana/metrics-selector: 'job="opentelemetry-demo/ad"'
+    grafana/overview-dashboard: 'li4hmgh?var-service=ad'
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-team
+  system: astronomy-shop
+  providesApis:
+    - ad-api
+  consumesApis:
+    - product-catalog-api
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: currency-service
+  description: Currency conversion service
+  tags:
+    - backend
+    - currency
+    - cpp
+    - production
+  annotations:
+    grafana/dashboard-selector: "currencyservice"
+    grafana/alert-label-selector: "service_name=currencyservice,service_namespace=opentelemetry-demo"
+    grafana/metrics-selector: 'job="opentelemetry-demo/currency"'
+    grafana/overview-dashboard: 'li4hmgh?var-service=currency'
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-team
+  system: astronomy-shop
+  providesApis:
+    - currency-api
+
+# ==================== INFRASTRUCTURE ====================
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: load-generator
+  description: Generates realistic user traffic for demo purposes
+  tags:
+    - infrastructure
+    - testing
+    - load-generator
+  annotations:
+    grafana/dashboard-selector: "loadgenerator"
+    grafana/alert-label-selector: "service_name=loadgenerator,service_namespace=opentelemetry-demo"
+spec:
+  type: service
+  lifecycle: experimental
+  owner: sre-team
+  system: astronomy-shop
+
+# ==================== APIS ====================
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: checkout-api
+  description: Checkout service gRPC API
+spec:
+  type: grpc
+  lifecycle: production
+  owner: checkout-team
+  system: astronomy-shop
+  definition: |
+    service CheckoutService {
+      rpc PlaceOrder(PlaceOrderRequest) returns (PlaceOrderResponse);
+    }
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: payment-api
+  description: Payment processing API
+spec:
+  type: grpc
+  lifecycle: production
+  owner: checkout-team
+  system: astronomy-shop
+  definition: |
+    service PaymentService {
+      rpc Charge(ChargeRequest) returns (ChargeResponse);
+    }
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: product-catalog-api
+  description: Product catalog API
+spec:
+  type: grpc
+  lifecycle: production
+  owner: platform-team
+  system: astronomy-shop
+  definition: |
+    service ProductCatalogService {
+      rpc ListProducts(Empty) returns (ListProductsResponse);
+      rpc GetProduct(GetProductRequest) returns (Product);
+    }
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: cart-api
+  description: Shopping cart API
+spec:
+  type: grpc
+  lifecycle: production
+  owner: platform-team
+  system: astronomy-shop
+  definition: |
+    service CartService {
+      rpc AddItem(AddItemRequest) returns (Empty);
+      rpc GetCart(GetCartRequest) returns (Cart);
+    }
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: recommendation-api
+  description: Product recommendations API
+spec:
+  type: grpc
+  lifecycle: production
+  owner: platform-team
+  system: astronomy-shop
+  definition: |
+    service RecommendationService {
+      rpc ListRecommendations(ListRecommendationsRequest) returns (ListRecommendationsResponse);
+    }
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: shipping-api
+  description: Shipping calculation API
+spec:
+  type: grpc
+  lifecycle: production
+  owner: checkout-team
+  system: astronomy-shop
+  definition: |
+    service ShippingService {
+      rpc GetQuote(GetQuoteRequest) returns (GetQuoteResponse);
+      rpc ShipOrder(ShipOrderRequest) returns (ShipOrderResponse);
+    }
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: email-api
+  description: Email notification API
+spec:
+  type: grpc
+  lifecycle: production
+  owner: platform-team
+  system: astronomy-shop
+  definition: |
+    service EmailService {
+      rpc SendOrderConfirmation(SendOrderConfirmationRequest) returns (Empty);
+    }
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: ad-api
+  description: Advertisement service API
+spec:
+  type: grpc
+  lifecycle: production
+  owner: platform-team
+  system: astronomy-shop
+  definition: |
+    service AdService {
+      rpc GetAds(AdRequest) returns (AdResponse);
+    }
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: currency-api
+  description: Currency conversion API
+spec:
+  type: grpc
+  lifecycle: production
+  owner: platform-team
+  system: astronomy-shop
+  definition: |
+    service CurrencyService {
+      rpc GetSupportedCurrencies(Empty) returns (GetSupportedCurrenciesResponse);
+      rpc Convert(CurrencyConversionRequest) returns (Money);
+    }

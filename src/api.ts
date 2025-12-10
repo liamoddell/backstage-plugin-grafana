@@ -179,9 +179,26 @@ class Client {
         url += `?${params}`;
       }
 
-      const response = await this.fetch<SLO[]>(url);
-      return response;
+      const response = await this.fetch<any>(url);
+
+      // Handle different response formats from Grafana SLO API
+      if (Array.isArray(response)) {
+        return response;
+      }
+
+      // Sometimes the API returns { slos: [...] }
+      if (response && Array.isArray(response.slos)) {
+        return response.slos;
+      }
+
+      // If response has a data property
+      if (response && Array.isArray(response.data)) {
+        return response.data;
+      }
+
+      return [];
     } catch (error) {
+      console.error('Error fetching SLOs:', error);
       return [];
     }
   }

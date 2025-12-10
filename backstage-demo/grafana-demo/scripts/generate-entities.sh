@@ -6,8 +6,16 @@
 #   2. Run: ./generate-entities.sh
 # OR
 #   GRAFANA_TOKEN=xxx GRAFANA_ORG=liamoddellmlt ./generate-entities.sh
+#
+# Test mode (just verify token):
+#   ./generate-entities.sh --test
 
 set -e
+
+TEST_MODE=false
+if [ "$1" = "--test" ]; then
+  TEST_MODE=true
+fi
 
 # Load from .env if it exists
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -36,17 +44,56 @@ fi
 echo "Fetching datasources from Grafana Cloud..."
 
 # Get Prometheus datasource UID
-DATASOURCES=$(curl -s -H "Authorization: Bearer $GRAFANA_TOKEN" \
+DATASOURCES=$(curl -s -w "\nHTTP_CODE:%{http_code}" -H "Authorization: Bearer $GRAFANA_TOKEN" \
   "${GRAFANA_URL}/api/datasources")
+
+# Extract HTTP code
+HTTP_CODE=$(echo "$DATASOURCES" | grep "HTTP_CODE:" | cut -d: -f2)
+DATASOURCES=$(echo "$DATASOURCES" | sed '/HTTP_CODE:/d')
+
+if [ "$HTTP_CODE" != "200" ]; then
+  echo "Error: Failed to fetch datasources (HTTP $HTTP_CODE)"
+  echo "Response: $DATASOURCES"
+  echo ""
+  echo "Troubleshooting:"
+  echo "  1. Check your GRAFANA_TOKEN is correct"
+  echo "  2. Token needs 'datasources:read' permission"
+  echo "  3. Verify URL: $GRAFANA_URL"
+  exit 1
+fi
+
+# Check if response is valid JSON array
+if ! echo "$DATASOURCES" | jq -e 'type == "array"' > /dev/null 2>&1; then
+  echo "Error: Invalid response from Grafana"
+  echo "Response: $DATASOURCES"
+  echo ""
+  echo "This usually means:"
+  echo "  - Invalid authentication token"
+  echo "  - Wrong Grafana URL: $GRAFANA_URL"
+  exit 1
+fi
 
 PROM_UID=$(echo "$DATASOURCES" | jq -r '.[] | select(.type=="prometheus") | .uid' | head -1)
 
 if [ -z "$PROM_UID" ]; then
   echo "Error: No Prometheus datasource found"
+  echo ""
+  echo "Available datasources:"
+  echo "$DATASOURCES" | jq -r '.[] | "  - \(.name) (\(.type))"'
   exit 1
 fi
 
 echo "Found Prometheus datasource: $PROM_UID"
+
+if [ "$TEST_MODE" = true ]; then
+  echo ""
+  echo "✅ Token is valid! Grafana API accessible."
+  echo ""
+  echo "To generate entities, run without --test flag:"
+  echo "  ./generate-entities.sh"
+  exit 0
+fi
+
 echo "Querying for service names..."
 
 # Query for all service names with span metrics

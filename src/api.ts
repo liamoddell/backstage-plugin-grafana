@@ -23,7 +23,7 @@ export interface GrafanaApi {
   alertsForSelector(selector: string): Promise<Alert[]>;
   getDashboardByUid(uid: string): Promise<DashboardDetail>;
   queryMetrics(query: string, timeRange: TimeRange, step?: string): Promise<TimeSeries[]>;
-  getSLOs(labelSelector?: string): Promise<SLO[]>;
+  getSLOs(labelSelector?: string, timeRange?: string): Promise<SLO[]>;
   getAlertDetails(selector: string): Promise<AlertDetail[]>;
 }
 
@@ -171,34 +171,171 @@ class Client {
     }));
   }
 
-  async getSLOs(labelSelector?: string): Promise<SLO[]> {
+  async getSLOs(labelSelector?: string, timeRange?: string): Promise<SLO[]> {
     try {
-      let url = '/api/plugins/grafana-slo-app/resources/v1/slo';
+      let url = '/api/plugins/grafana-slo-app/resources/v1/slo?includeStatus=true';
       if (labelSelector) {
-        const params = new URLSearchParams({ labelSelector });
-        url += `?${params}`;
+        url += `&labelSelector=${encodeURIComponent(labelSelector)}`;
       }
 
       const response = await this.fetch<any>(url);
+      let slos: SLO[] = [];
 
-      // Handle different response formats from Grafana SLO API
       if (Array.isArray(response)) {
-        return response;
+        slos = response;
+      } else if (response && Array.isArray(response.slos)) {
+        slos = response.slos;
+      } else if (response && Array.isArray(response.data)) {
+        slos = response.data;
       }
 
-      // Sometimes the API returns { slos: [...] }
-      if (response && Array.isArray(response.slos)) {
-        return response.slos;
+      if (labelSelector && slos.length > 0) {
+        const [key, value] = labelSelector.split('=');
+        if (key && value) {
+          slos = slos.filter(slo =>
+            slo.labels &&
+            Array.isArray(slo.labels) &&
+            slo.labels.some(label => label.key === key && label.value === value)
+          );
+        }
       }
 
-      // If response has a data property
-      if (response && Array.isArray(response.data)) {
-        return response.data;
-      }
+      const slosWithStatus = await Promise.all(
+        slos.map(async (slo) => {
+          try {
+            const datasourceUid = await this.getDefaultPrometheusUid();
+            const now = Math.floor(Date.now() / 1000);
 
-      return [];
+            let lookback = '5m';
+            if (timeRange) {
+              const match = timeRange.match(/now-(.+)/);
+              if (match) {
+                lookback = match[1];
+              } else {
+                lookback = timeRange;
+              }
+            }
+
+            const from = this.parseTimeRange(timeRange || 'now-1h', now);
+            const to = now;
+
+            const sliQuery = `clamp_max(sum(sum_over_time((grafana_slo_success_rate_5m{grafana_slo_uuid="${slo.uuid}"} < +Inf)[${lookback}:5m])) / sum(sum_over_time((grafana_slo_total_rate_5m{grafana_slo_uuid="${slo.uuid}"} < +Inf)[${lookback}:5m])), 1)`;
+            const errorBudgetQuery = `(clamp_max(sum(sum_over_time((grafana_slo_success_rate_5m{grafana_slo_uuid="${slo.uuid}"} < +Inf)[28d:5m])) / sum(sum_over_time((grafana_slo_total_rate_5m{grafana_slo_uuid="${slo.uuid}"} < +Inf)[28d:5m])), 1) - on() grafana_slo_objective{grafana_slo_uuid="${slo.uuid}"}) / on () (1 - grafana_slo_objective{grafana_slo_uuid="${slo.uuid}"})`;
+            const totalEventsQuery = `300 * sum(sum_over_time((grafana_slo_total_rate_5m{grafana_slo_uuid="${slo.uuid}"} < +Inf)[${lookback}:5m]))`;
+            const failureEventsQuery = `clamp_min(300 * (sum(sum_over_time((grafana_slo_total_rate_5m{grafana_slo_uuid="${slo.uuid}"} < +Inf)[${lookback}:5m])) - sum(sum_over_time((grafana_slo_success_rate_5m{grafana_slo_uuid="${slo.uuid}"} < +Inf)[${lookback}:5m]))), 0)`;
+            const sliTimeSeriesQuery = `clamp_max(sum(avg_over_time((grafana_slo_success_rate_5m{grafana_slo_uuid="${slo.uuid}"} < +Inf)[1m:])) / sum(avg_over_time((grafana_slo_total_rate_5m{grafana_slo_uuid="${slo.uuid}"} < +Inf)[1m:])), 1)`;
+
+            const [sliResponse, budgetResponse, totalEventsResponse, failureEventsResponse, sliTimeSeriesResponse] = await Promise.all([
+              this.fetch<MetricsQueryResponse>(
+                `/api/datasources/proxy/uid/${datasourceUid}/api/v1/query?query=${encodeURIComponent(sliQuery)}&time=${now}`
+              ).catch(() => null),
+              this.fetch<MetricsQueryResponse>(
+                `/api/datasources/proxy/uid/${datasourceUid}/api/v1/query?query=${encodeURIComponent(errorBudgetQuery)}&time=${now}`
+              ).catch(() => null),
+              this.fetch<MetricsQueryResponse>(
+                `/api/datasources/proxy/uid/${datasourceUid}/api/v1/query?query=${encodeURIComponent(totalEventsQuery)}&time=${now}`
+              ).catch(() => null),
+              this.fetch<MetricsQueryResponse>(
+                `/api/datasources/proxy/uid/${datasourceUid}/api/v1/query?query=${encodeURIComponent(failureEventsQuery)}&time=${now}`
+              ).catch(() => null),
+              this.fetch<MetricsQueryResponse>(
+                `/api/datasources/proxy/uid/${datasourceUid}/api/v1/query_range?query=${encodeURIComponent(sliTimeSeriesQuery)}&start=${from}&end=${to}&step=60`
+              ).catch(() => null),
+            ]);
+
+            let current: number | undefined;
+            let remainingBudget: number | undefined;
+            let totalEvents: number | undefined;
+            let failureEvents: number | undefined;
+            let sliTimeSeries: TimeSeries[] = [];
+            const isRatioQuery = slo.query.type === 'ratio';
+
+            if (sliResponse && sliResponse.status === 'success' && sliResponse.data.result.length > 0) {
+              const value = sliResponse.data.result[0].value;
+              if (value && value.length > 1) {
+                current = parseFloat(value[1]);
+              }
+            } else if (!isRatioQuery) {
+              const fallbackSliQuery = `avg_over_time(grafana_slo_sli_1d{grafana_slo_uuid="${slo.uuid}"}[${lookback}])`;
+              const fallbackResponse = await this.fetch<MetricsQueryResponse>(
+                `/api/datasources/proxy/uid/${datasourceUid}/api/v1/query?query=${encodeURIComponent(fallbackSliQuery)}&time=${now}`
+              ).catch(() => null);
+
+              if (fallbackResponse && fallbackResponse.status === 'success' && fallbackResponse.data.result.length > 0) {
+                const value = fallbackResponse.data.result[0].value;
+                if (value && value.length > 1) {
+                  current = parseFloat(value[1]);
+                }
+              }
+            }
+
+            if (budgetResponse && budgetResponse.status === 'success' && budgetResponse.data.result.length > 0) {
+              const value = budgetResponse.data.result[0].value;
+              if (value && value.length > 1) {
+                const rawValue = parseFloat(value[1]);
+                remainingBudget = rawValue > 1 ? rawValue : rawValue * 100;
+              }
+            }
+
+            if (totalEventsResponse && totalEventsResponse.status === 'success' && totalEventsResponse.data.result.length > 0) {
+              const value = totalEventsResponse.data.result[0].value;
+              if (value && value.length > 1) {
+                totalEvents = parseFloat(value[1]);
+              }
+            }
+
+            if (failureEventsResponse && failureEventsResponse.status === 'success' && failureEventsResponse.data.result.length > 0) {
+              const value = failureEventsResponse.data.result[0].value;
+              if (value && value.length > 1) {
+                failureEvents = parseFloat(value[1]);
+              }
+            }
+
+            if (sliTimeSeriesResponse && sliTimeSeriesResponse.status === 'success' && sliTimeSeriesResponse.data.result.length > 0) {
+              sliTimeSeries = sliTimeSeriesResponse.data.result.map(result => ({
+                target: 'SLI',
+                datapoints: result.values.map(([timestamp, value]) => ({
+                  timestamp: timestamp * 1000,
+                  value: parseFloat(value),
+                })),
+              }));
+            } else if (!isRatioQuery) {
+              const fallbackTimeSeriesQuery = `grafana_slo_sli_1d{grafana_slo_uuid="${slo.uuid}"}`;
+              const fallbackTimeSeriesResponse = await this.fetch<MetricsQueryResponse>(
+                `/api/datasources/proxy/uid/${datasourceUid}/api/v1/query_range?query=${encodeURIComponent(fallbackTimeSeriesQuery)}&start=${from}&end=${to}&step=60`
+              ).catch(() => null);
+
+              if (fallbackTimeSeriesResponse && fallbackTimeSeriesResponse.status === 'success' && fallbackTimeSeriesResponse.data.result.length > 0) {
+                sliTimeSeries = fallbackTimeSeriesResponse.data.result.map(result => ({
+                  target: 'SLI',
+                  datapoints: result.values.map(([timestamp, value]) => ({
+                    timestamp: timestamp * 1000,
+                    value: parseFloat(value),
+                  })),
+                }));
+              }
+            }
+
+            const status = current !== undefined ? {
+              current,
+              remaining_error_budget: remainingBudget !== undefined ? remainingBudget : 0,
+              total_events: totalEvents,
+              failure_events: failureEvents,
+            } : undefined;
+
+            return {
+              ...slo,
+              status,
+              sliTimeSeries: sliTimeSeries.length > 0 ? sliTimeSeries : undefined,
+            };
+          } catch (error) {
+            return slo;
+          }
+        })
+      );
+
+      return slosWithStatus;
     } catch (error) {
-      console.error('Error fetching SLOs:', error);
       return [];
     }
   }
@@ -206,14 +343,28 @@ class Client {
   private async getDefaultPrometheusUid(): Promise<string> {
     try {
       const datasources = await this.fetch<any[]>('/api/datasources');
-      const promDs = datasources.find(ds => ds.type === 'prometheus' && ds.isDefault);
-      if (promDs) {
-        return promDs.uid;
+
+      // 1. Check for default Prometheus datasource
+      const defaultPromDs = datasources.find(ds => ds.type === 'prometheus' && ds.isDefault);
+      if (defaultPromDs) {
+        return defaultPromDs.uid;
       }
+
+      // 2. Prefer Grafana Cloud Prometheus datasource (grafanacloud-*-prom or grafanacloud-*-metrics)
+      const grafanaCloudPromDs = datasources.find(ds =>
+        ds.type === 'prometheus' &&
+        (ds.name.match(/grafanacloud-.*-prom$/) || ds.name.match(/grafanacloud-.*-metrics$/))
+      );
+      if (grafanaCloudPromDs) {
+        return grafanaCloudPromDs.uid;
+      }
+
+      // 3. Fall back to any Prometheus datasource
       const anyPromDs = datasources.find(ds => ds.type === 'prometheus');
       if (anyPromDs) {
         return anyPromDs.uid;
       }
+
       throw new Error('No Prometheus datasource found');
     } catch (error) {
       throw new Error(`Failed to find Prometheus datasource: ${error}`);
@@ -303,8 +454,8 @@ export class GrafanaApiClient implements GrafanaApi {
     return this.client.queryMetrics(query, timeRange, step);
   }
 
-  async getSLOs(labelSelector?: string): Promise<SLO[]> {
-    return this.client.getSLOs(labelSelector);
+  async getSLOs(labelSelector?: string, timeRange?: string): Promise<SLO[]> {
+    return this.client.getSLOs(labelSelector, timeRange);
   }
 
   async getAlertDetails(dashboardTag: string): Promise<AlertDetail[]> {
@@ -358,8 +509,8 @@ export class UnifiedAlertingGrafanaApiClient implements GrafanaApi {
     return this.client.queryMetrics(query, timeRange, step);
   }
 
-  async getSLOs(labelSelector?: string): Promise<SLO[]> {
-    return this.client.getSLOs(labelSelector);
+  async getSLOs(labelSelector?: string, timeRange?: string): Promise<SLO[]> {
+    return this.client.getSLOs(labelSelector, timeRange);
   }
 
   async getAlertDetails(selector: string): Promise<AlertDetail[]> {

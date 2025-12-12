@@ -85,8 +85,14 @@ export interface SLO {
   status?: {
     current: number;
     remaining_error_budget: number;
+    total_events?: number;
+    failure_events?: number;
   };
-  labels?: Record<string, string>;
+  sliTimeSeries?: TimeSeries[];
+  labels?: Array<{
+    key: string;
+    value: string;
+  }>;
 }
 
 export interface AlertDetail extends Alert {

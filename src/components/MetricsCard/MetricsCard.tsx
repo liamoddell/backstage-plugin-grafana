@@ -196,6 +196,9 @@ export const MetricsCard = (opts?: MetricsCardOpts) => {
   const [autoRefresh, _setAutoRefresh] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
 
+  // Extract callback to avoid opts dependency issues
+  const onTimeRangeChange = opts?.onTimeRangeChange;
+
   // Update refreshKey when time range changes
   useEffect(() => {
     setRefreshKey(prev => prev + 1);
@@ -203,14 +206,14 @@ export const MetricsCard = (opts?: MetricsCardOpts) => {
 
   // Notify parent component of time range changes
   useEffect(() => {
-    if (opts?.onTimeRangeChange) {
+    if (onTimeRangeChange) {
       const selectedTimeRange: TimeRange = {
         from: TIME_RANGE_OPTIONS[timeRange].from,
         to: 'now',
       };
-      opts.onTimeRangeChange(selectedTimeRange);
+      onTimeRangeChange(selectedTimeRange);
     }
-  }, [timeRange, opts]);
+  }, [timeRange, onTimeRangeChange]);
 
   useEffect(() => {
     if (!autoRefresh) return;

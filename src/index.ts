@@ -29,6 +29,12 @@ export {
   EntityOverviewDashboardViewer,
 } from './plugin';
 export {
+  grafanaApiRef,
+  GrafanaApiClient,
+  UnifiedAlertingGrafanaApiClient,
+} from './api';
+export type { GrafanaApi } from './api';
+export {
   isDashboardSelectorAvailable,
   isAlertSelectorAvailable,
   isOverviewDashboardAvailable,

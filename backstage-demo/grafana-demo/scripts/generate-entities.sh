@@ -100,21 +100,80 @@ if [ "$TEST_MODE" = true ]; then
   exit 0
 fi
 
-echo "Querying for service names..."
+echo "Querying for service names with recent activity (last 24h)..."
 
-# Query for all service names with span metrics
-SERVICES=$(curl -s -H "Authorization: Bearer $GRAFANA_TOKEN" \
-  "${GRAFANA_URL}/api/datasources/proxy/uid/${PROM_UID}/api/v1/label/service_name/values" \
-  | jq -r '.data[]' | sort -u)
+# Query for all service names with span metrics in the last 24 hours
+# This filters out stale services that no longer report data
+SERVICES_JSON=$(curl -s -H "Authorization: Bearer $GRAFANA_TOKEN" \
+  "${GRAFANA_URL}/api/datasources/proxy/uid/${PROM_UID}/api/v1/query" \
+  --data-urlencode 'query=count by (service_name) (count_over_time(traces_spanmetrics_calls_total{span_kind="SPAN_KIND_SERVER"}[24h]))' \
+  | jq -r '.data.result[] | .metric.service_name' | sort -u)
 
-if [ -z "$SERVICES" ]; then
-  echo "Error: No services found with span metrics"
+if [ -z "$SERVICES_JSON" ]; then
+  echo "Error: No services found with recent span metrics (last 24h)"
   echo "Make sure your OTEL collector is generating traces_spanmetrics_calls_total metrics"
+  echo "And that services have reported data in the last 24 hours"
   exit 1
 fi
 
-echo "Found services:"
+# List of services to exclude (already manually defined in entities.yaml)
+# These services have better manual definitions with proper relationships and metadata
+EXCLUDE_SERVICES=(
+  "frontend"
+  "checkoutservice"
+  "checkout"
+  "paymentservice"
+  "payment"
+  "productcatalogservice"
+  "product-catalog"
+  "cartservice"
+  "cart"
+  "recommendationservice"
+  "recommendation"
+  "shippingservice"
+  "shipping"
+  "emailservice"
+  "email"
+  "adservice"
+  "ad"
+  "currencyservice"
+  "currency"
+  "loadgenerator"
+  "load-generator"
+)
+
+# Filter out excluded services
+SERVICES=""
+for service in $SERVICES_JSON; do
+  EXCLUDED=false
+  for exclude in "${EXCLUDE_SERVICES[@]}"; do
+    if [ "$service" = "$exclude" ]; then
+      EXCLUDED=true
+      break
+    fi
+  done
+
+  if [ "$EXCLUDED" = false ]; then
+    SERVICES="$SERVICES$service
+"
+  fi
+done
+
+# Trim whitespace
+SERVICES=$(echo "$SERVICES" | sed '/^$/d')
+
+if [ -z "$SERVICES" ]; then
+  echo "Note: All discovered services are already manually defined in entities.yaml"
+  echo "No new services to add. This is normal if you have a stable set of services."
+  echo ""
+  echo "To regenerate all services (including manual ones), remove them from entities.yaml first."
+  exit 0
+fi
+
+echo "Found active services (last 24h):"
 echo "$SERVICES"
+echo ""
+echo "Note: Excluding manually-defined services from entities.yaml"
 echo ""
 echo "Generating entities.yaml..."
 
@@ -125,37 +184,31 @@ cat > "$OUTPUT_FILE" <<EOF
 # Auto-generated from Grafana Cloud metrics
 # Generated: $(date)
 # DO NOT EDIT MANUALLY - Run scripts/generate-entities.sh to regenerate
-
----
-# Systems
-apiVersion: backstage.io/v1alpha1
-kind: System
-metadata:
-  name: microservices-platform
-  description: Microservices Platform (auto-discovered from Grafana)
-spec:
-  owner: platform-team
-
----
-# Teams
-apiVersion: backstage.io/v1alpha1
-kind: Group
-metadata:
-  name: platform-team
-  description: Platform Engineering Team
-spec:
-  type: team
-  children: []
+#
+# This file contains auto-discovered services from Grafana Cloud that have:
+# - Reported span metrics (traces_spanmetrics_calls_total) in the last 24 hours
+# - Are not already manually defined in entities.yaml
+#
+# Manually curated services (with relationships, detailed metadata) are in entities.yaml
 
 EOF
 
 # Generate component for each service
 for service in $SERVICES; do
+  # Skip invalid/placeholder service names
+  case "$service" in
+    "null"|"unknown"|"undefined"|"N/A"|""|"-")
+      echo "Skipping invalid service name: $service"
+      continue
+      ;;
+  esac
+
   # Clean service name for Backstage (lowercase, replace special chars)
   entity_name=$(echo "$service" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g')
 
-  # Skip if service name is empty or invalid
+  # Skip if service name is empty or invalid after cleaning
   if [ -z "$entity_name" ] || [ "$entity_name" = "-" ]; then
+    echo "Skipping invalid entity name after cleaning: $service -> $entity_name"
     continue
   fi
 

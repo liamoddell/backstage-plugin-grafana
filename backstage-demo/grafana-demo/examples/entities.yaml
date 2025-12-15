@@ -75,21 +75,19 @@ metadata:
     - web
     - nextjs
     - production
+  labels:
+    service_name: frontend
   links:
     - url: http://localhost:8080
       title: Frontend UI
       icon: web
   annotations:
-    # For MetricsCard - OpenTelemetry span metrics
-    grafana/metrics-selector: 'service_name="frontend",span_kind="SPAN_KIND_SERVER"'
-    # For EnhancedAlertsCard - unified alerting
+    grafana/metrics-selector: 'service="frontend"'
     grafana/alert-label-selector: 'service_name=frontend'
-    # For SLOCard
     grafana/slo-label-selector: 'service_name=frontend'
-    # Dashboard
     grafana/overview-dashboard: 'li4hmgh?var-service=frontend'
 spec:
-  type: website
+  type: service
   lifecycle: production
   owner: platform-team
   system: astronomy-shop
@@ -98,7 +96,7 @@ spec:
     - component:default/product-catalog-service
     - component:default/cart-service
     - component:default/recommendation-service
-    - component:default/ad-service
+    - component:default/ad
     - component:default/currency-service
 
 # ==================== BACKEND SERVICES ====================
@@ -117,7 +115,7 @@ metadata:
     - critical
   annotations:
     # For MetricsCard - OpenTelemetry span metrics
-    grafana/metrics-selector: 'service_name="checkoutservice",span_kind="SPAN_KIND_SERVER"'
+    grafana/metrics-selector: 'service="checkout"'
     # For EnhancedAlertsCard - unified alerting
     grafana/alert-label-selector: 'service_name=checkoutservice,service_namespace=opentelemetry-demo'
     # For SLOCard
@@ -156,7 +154,8 @@ metadata:
   annotations:
     grafana/dashboard-selector: "paymentservice"
     grafana/alert-label-selector: "service_name=paymentservice,service_namespace=opentelemetry-demo"
-    grafana/metrics-selector: 'job="opentelemetry-demo/payment"'
+    grafana/metrics-selector: 'service="payment"'
+    grafana/slo-label-selector: 'service_name=paymentservice'
     grafana/overview-dashboard: 'li4hmgh?var-service=payment'
 spec:
   type: service
@@ -180,7 +179,8 @@ metadata:
   annotations:
     grafana/dashboard-selector: "productcatalogservice"
     grafana/alert-label-selector: "service_name=productcatalogservice,service_namespace=opentelemetry-demo"
-    grafana/metrics-selector: 'job="opentelemetry-demo/productcatalog"'
+    grafana/metrics-selector: 'service="product-catalog"'
+    grafana/slo-label-selector: 'service_name=productcatalogservice'
     grafana/overview-dashboard: 'li4hmgh?var-service=product-catalog'
 spec:
   type: service
@@ -201,10 +201,13 @@ metadata:
     - cart
     - dotnet
     - production
+  labels:
+    service_name: cartservice
   annotations:
     grafana/dashboard-selector: "cartservice"
     grafana/alert-label-selector: "service_name=cartservice,service_namespace=opentelemetry-demo"
-    grafana/metrics-selector: 'job="opentelemetry-demo/cart"'
+    grafana/metrics-selector: 'service="cart"'
+    grafana/slo-label-selector: 'service_name=cartservice'
     grafana/overview-dashboard: 'li4hmgh?var-service=cart'
 spec:
   type: service
@@ -228,7 +231,8 @@ metadata:
   annotations:
     grafana/dashboard-selector: "recommendationservice"
     grafana/alert-label-selector: "service_name=recommendationservice,service_namespace=opentelemetry-demo"
-    grafana/metrics-selector: 'job="opentelemetry-demo/recommendation"'
+    grafana/metrics-selector: 'service="recommendation"'
+    grafana/slo-label-selector: 'service_name=recommendationservice'
     grafana/overview-dashboard: 'li4hmgh?var-service=recommendation'
 spec:
   type: service
@@ -254,7 +258,8 @@ metadata:
   annotations:
     grafana/dashboard-selector: "shippingservice"
     grafana/alert-label-selector: "service_name=shippingservice,service_namespace=opentelemetry-demo"
-    grafana/metrics-selector: 'job="opentelemetry-demo/shipping"'
+    grafana/metrics-selector: 'service="shipping"'
+    grafana/slo-label-selector: 'service_name=shippingservice'
     grafana/overview-dashboard: 'li4hmgh?var-service=shipping'
 spec:
   type: service
@@ -278,7 +283,8 @@ metadata:
   annotations:
     grafana/dashboard-selector: "emailservice"
     grafana/alert-label-selector: "service_name=emailservice,service_namespace=opentelemetry-demo"
-    grafana/metrics-selector: 'job="opentelemetry-demo/email"'
+    grafana/metrics-selector: 'service="email"'
+    grafana/slo-label-selector: 'service_name=emailservice'
     grafana/overview-dashboard: 'li4hmgh?var-service=email'
 spec:
   type: service
@@ -292,17 +298,20 @@ spec:
 apiVersion: backstage.io/v1alpha1
 kind: Component
 metadata:
-  name: ad-service
+  name: ad
   description: Serves contextual advertisements
   tags:
     - backend
     - advertising
     - java
     - production
+  labels:
+    service_name: ad
   annotations:
     grafana/dashboard-selector: "adservice"
     grafana/alert-label-selector: "service_name=adservice,service_namespace=opentelemetry-demo"
-    grafana/metrics-selector: 'job="opentelemetry-demo/ad"'
+    grafana/metrics-selector: 'service="ad"'
+    grafana/slo-label-selector: 'service_name=ad'
     grafana/overview-dashboard: 'li4hmgh?var-service=ad'
 spec:
   type: service
@@ -328,7 +337,8 @@ metadata:
   annotations:
     grafana/dashboard-selector: "currencyservice"
     grafana/alert-label-selector: "service_name=currencyservice,service_namespace=opentelemetry-demo"
-    grafana/metrics-selector: 'job="opentelemetry-demo/currency"'
+    grafana/metrics-selector: 'service="currency"'
+    grafana/slo-label-selector: 'service_name=currencyservice'
     grafana/overview-dashboard: 'li4hmgh?var-service=currency'
 spec:
   type: service

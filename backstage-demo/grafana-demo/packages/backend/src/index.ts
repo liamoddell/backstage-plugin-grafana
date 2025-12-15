@@ -38,6 +38,9 @@ backend.add(import('@backstage/plugin-catalog-backend'));
 // Grafana auto-discovery module
 backend.add(import('./plugins/grafanaDiscovery'));
 
+// Grafana service model catalog integration
+backend.add(import('@grafana/catalog-backend-module-grafana-servicemodel'));
+
 // See https://backstage.io/docs/features/software-catalog/configuration#subscribing-to-catalog-errors
 backend.add(import('@backstage/plugin-catalog-backend-module-logs'));
 

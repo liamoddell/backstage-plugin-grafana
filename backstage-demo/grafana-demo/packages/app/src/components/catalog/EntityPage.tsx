@@ -1,3 +1,4 @@
+import React, { useState, useCallback } from 'react';
 import { Button, Grid } from '@material-ui/core';
 import {
   EntityApiDefinitionCard,
@@ -59,7 +60,6 @@ import {
 } from '@backstage/plugin-kubernetes';
 
 import {
-  EntityGrafanaAlertsCard,
   EntityGrafanaMetricsCard,
   EntityGrafanaDashboardsCard,
   EntityGrafanaEnhancedAlertsCard,
@@ -151,6 +151,32 @@ const overviewContent = (
   </Grid>
 );
 
+// Wrapper component for Grafana content with shared time range
+const GrafanaContent = React.memo(() => {
+  const [sharedTimeRange, setSharedTimeRange] = useState({ from: 'now-1h', to: 'now' });
+
+  const handleTimeRangeChange = useCallback((newTimeRange: { from: string; to: string }) => {
+    setSharedTimeRange(newTimeRange);
+  }, []);
+
+  return (
+    <Grid container spacing={3} alignItems="stretch">
+      <Grid item xs={12}>
+        <EntityGrafanaMetricsCard onTimeRangeChange={handleTimeRangeChange} />
+      </Grid>
+      <Grid item md={6}>
+        <EntityGrafanaSLOCard timeRange={sharedTimeRange} />
+      </Grid>
+      <Grid item md={6}>
+        <EntityGrafanaEnhancedAlertsCard />
+      </Grid>
+      <Grid item xs={12}>
+        <EntityGrafanaDashboardsCard />
+      </Grid>
+    </Grid>
+  );
+});
+
 const serviceEntityPage = (
   <EntityLayout>
     <EntityLayout.Route path="/" title="Overview">
@@ -196,20 +222,7 @@ const serviceEntityPage = (
     </EntityLayout.Route>
 
     <EntityLayout.Route path="/grafana" title="Grafana">
-      <Grid container spacing={3} alignItems="stretch">
-        <Grid item xs={12}>
-          <EntityGrafanaMetricsCard />
-        </Grid>
-        <Grid item md={6}>
-          <EntityGrafanaSLOCard />
-        </Grid>
-        <Grid item md={6}>
-          <EntityGrafanaEnhancedAlertsCard />
-        </Grid>
-        <Grid item xs={12}>
-          <EntityGrafanaDashboardsCard />
-        </Grid>
-      </Grid>
+      <GrafanaContent />
     </EntityLayout.Route>
   </EntityLayout>
 );
@@ -248,20 +261,7 @@ const websiteEntityPage = (
     </EntityLayout.Route>
 
     <EntityLayout.Route path="/grafana" title="Grafana">
-      <Grid container spacing={3} alignItems="stretch">
-        <Grid item xs={12}>
-          <EntityGrafanaMetricsCard />
-        </Grid>
-        <Grid item md={6}>
-          <EntityGrafanaSLOCard />
-        </Grid>
-        <Grid item md={6}>
-          <EntityGrafanaEnhancedAlertsCard />
-        </Grid>
-        <Grid item xs={12}>
-          <EntityGrafanaDashboardsCard />
-        </Grid>
-      </Grid>
+      <GrafanaContent />
     </EntityLayout.Route>
   </EntityLayout>
 );

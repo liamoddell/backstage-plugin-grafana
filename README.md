@@ -1,16 +1,18 @@
 # Grafana plugin for Backstage
 
-The Grafana plugin is a frontend plugin that provides comprehensive Grafana integration for Backstage. It includes several components that can be integrated into Backstage:
+The Grafana plugin is a frontend plugin that provides comprehensive Grafana integration for Backstage.
+
+> **Note:** This is an enhanced fork of the [original backstage-plugin-grafana](https://github.com/K-Phoen/backstage-plugin-grafana) by [K-Phoen](https://github.com/K-Phoen). We've built upon the excellent foundation to add advanced observability features including inline metrics visualization, enhanced alerts, and SLO tracking with time-series charts.
 
 ## Components
 
-### Core Components
+### Core Components (Original)
 * **`EntityGrafanaDashboardsCard`** - Display dashboards for a specific entity
 * **`EntityGrafanaAlertsCard`** - Display recent alerts for a specific entity
 * **`EntityOverviewDashboardViewer`** - Embed an "overview" dashboard for a specific entity
 * **`DashboardViewer`** - Embed any dashboard
 
-### Enhanced Components (New)
+### Enhanced Components (New in this Fork)
 * **`EntityGrafanaMetricsCard`** - Display inline RED metrics (Request rate, Error rate, Duration) with time-series visualization
 * **`EntityGrafanaEnhancedAlertsCard`** - Enhanced alerts display with severity grouping, metadata, and firing duration
 * **`EntityGrafanaSLOCard`** - Display SLOs with error budget tracking and burn rate indicators
@@ -125,6 +127,8 @@ spec:
 
 ## How does it look?
 
+### Original Components
+
 Entity alerts card:
 
 ![Alerts card](./docs/alerts_card.png)
@@ -132,6 +136,20 @@ Entity alerts card:
 Entity dashboards card:
 
 ![Dashboards card](./docs/dashboards_card.png)
+
+### Enhanced Components (New in this Fork)
+
+Entity metrics card with RED metrics visualization:
+
+![Metrics card](./docs/metrics_card.png)
+
+Entity enhanced alerts card with severity grouping:
+
+![Enhanced alerts card](./docs/enhanced_alerts_card.png)
+
+Entity SLO card with time-series tracking:
+
+![SLO card](./docs/slo_card.png)
 
 ## License
 

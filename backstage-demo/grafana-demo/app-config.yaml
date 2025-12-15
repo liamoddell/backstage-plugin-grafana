@@ -84,6 +84,9 @@ catalog:
   rules:
     - allow: [Component, System, API, Resource, Location, Group, User]
   locations:
+    # Auto-generated entities from Grafana metrics
+    - type: file
+      target: ../../examples/entities-generated.yaml
     # Local example data, file locations are relative to the backend process, typically `packages/backend`
     - type: file
       target: ../../examples/entities.yaml
@@ -121,22 +124,21 @@ permission:
 # Grafana plugin configuration
 grafana:
   domain: 'https://liamoddellmlt.grafana.net'
-  unifiedAlerting: true  # Grafana Cloud uses unified alerting
+  unifiedAlerting: true
 
-  # Auto-discovery configuration
-  # Supports Grafana's single-stack approach with label-based environment filtering
   discovery:
-    enabled: false  # Disabled for now - add 'backstage' tag to your dashboards in Grafana to enable
-    # Optional: Filter dashboards by folder
-    # folders:
-    #   - "Production Services"
-    #   - "Infrastructure"
-    # Optional: Filter dashboards by tags - uncomment and enable discovery when ready
+    enabled: false
     tags:
       - "backstage"
-    # Naming convention for extracting service names
-    namingConvention: 'extract-from-title'  # Options: 'use-variable' (extract from template vars) or 'extract-from-title'
-    # Label used for environment differentiation in single-stack setups
-    environmentLabel: 'deployment_environment'  # Grafana label for environment filtering
-    # Refresh interval in seconds
-    refreshInterval: 300  # 5 minutes
+    namingConvention: 'extract-from-title'
+    environmentLabel: 'deployment_environment'
+    refreshInterval: 300
+
+grafanaCloudCatalogInfo:
+  enable: true
+  stack_slug: liamoddellmlt
+  grafana_endpoint: https://grafana.com
+  token: ${GRAFANA_CLOUD_ACCESS_TOKEN}
+  allow:
+    - kind=Component,spec.type=service
+    - kind=Group,spec.type=team

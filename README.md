@@ -21,6 +21,46 @@ The Grafana plugin is a frontend plugin that provides comprehensive Grafana inte
 
 Find [installation instructions](./docs/index.md#installation) in our documentation.
 
+## Configuration
+
+After installing the plugin, you need to configure the connection to your Grafana instance:
+
+### 1. Configure the Grafana Proxy
+
+Add the Grafana proxy configuration to your `app-config.yaml`:
+
+```yaml
+proxy:
+  endpoints:
+    '/grafana/api':
+      target: 'https://YOUR_ORG.grafana.net/'  # Replace with your Grafana URL
+      headers:
+        Authorization: 'Bearer ${GRAFANA_TOKEN}'
+```
+
+### 2. Set Your Grafana Token
+
+Create a service account token in Grafana with Viewer permissions:
+- For Grafana Cloud: `https://YOUR_ORG.grafana.net/org/serviceaccounts`
+- Store the token securely (e.g., in environment variables or `.env` file)
+
+```bash
+# In your .env file or environment
+GRAFANA_TOKEN=glsa_your_token_here
+```
+
+### 3. Configure Plugin Settings
+
+Add the Grafana plugin configuration to your `app-config.yaml`:
+
+```yaml
+grafana:
+  domain: 'https://YOUR_ORG.grafana.net'
+  unifiedAlerting: true  # Use unified alerting (Grafana 8+)
+```
+
+**Note:** Never commit tokens or credentials to version control. Use environment variables or secret management tools.
+
 ## Usage
 
 ### MetricsCard - Inline RED Metrics
